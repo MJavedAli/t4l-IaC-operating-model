@@ -6,7 +6,7 @@
 
 ## Context
 
-RAKSUL needs common AWS and Terraform standards while a small Cloud Infra team supports many product teams, legacy printing infrastructure, group-wide services, and M&A environments. A pure monorepo can become noisy and over-centralised; immediate polyrepo adoption duplicates pipelines and governance before stable boundaries exist.
+r4l needs common AWS and Terraform standards while a small Cloud Infra team supports many product teams, legacy printing infrastructure, group-wide services, and M&A environments. A pure monorepo can become noisy and over-centralised; immediate polyrepo adoption duplicates pipelines and governance before stable boundaries exist.
 
 ## Decision
 

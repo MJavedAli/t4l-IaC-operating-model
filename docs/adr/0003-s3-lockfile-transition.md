@@ -6,7 +6,7 @@
 
 ## Context
 
-Existing Terraform estates commonly use an S3 backend plus a DynamoDB lock table. Current Terraform supports S3-native lockfiles through `use_lockfile = true`, while DynamoDB-based locking is deprecated. RAKSUL may need compatibility during a staged Terraform upgrade.
+Existing Terraform estates commonly use an S3 backend plus a DynamoDB lock table. Current Terraform supports S3-native lockfiles through `use_lockfile = true`, while DynamoDB-based locking is deprecated. r4l may need compatibility during a staged Terraform upgrade.
 
 ## Decision
 

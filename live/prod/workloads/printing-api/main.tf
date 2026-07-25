@@ -9,7 +9,7 @@ locals {
     ManagedBy          = "Terraform"
     Owner              = "printing-platform"
     Service            = local.service_name
-    Repository         = "raksul-terraform-operating-model"
+    Repository         = "r4l-terraform-operating-model"
   }
 }
 

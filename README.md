@@ -1,6 +1,6 @@
-# RAKSUL Terraform Operating Model — Interview Sample
+# R4L Terraform Operating Model
 
-> **Purpose:** demonstrate a small, end-to-end Terraform operating model for an AWS-centric, multi-account organisation. This repository is an assessment artefact, not RAKSUL production code.
+> **Purpose:** demonstrate a small, end-to-end Terraform operating model for an AWS-centric, multi-account organisation. This repository is an assessment artefact, not r4l production code.
 
 ## 1. Purpose
 
@@ -371,6 +371,6 @@ make policy ROOT=live/prod/workloads/printing-api
 | OPA policy | Executable-oriented example | Run Conftest against a real plan JSON; expand tests and exception handling before broad enforcement |
 | Account IDs, ARNs, bucket names | Illustrative | Must be replaced |
 
-## Interview discussion points
+##  Discussion points
 
 This repository intentionally makes trade-offs visible: monorepo simplicity versus future autonomy, local module references versus released versions, S3 lockfile migration versus existing DynamoDB locks, product self-service versus central controls, and gradual adoption versus greenfield purity.
