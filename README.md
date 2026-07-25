@@ -14,6 +14,7 @@ The design assumes:
 - The Cloud Infra team will remain small while the engineering organisation grows toward 300 people.
 - English is the default language for code, documentation, ADRs, and reviews.
 
+
 ## 2. Scope and non-goals
 
 ### In scope
