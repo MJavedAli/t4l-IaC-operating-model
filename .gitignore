@@ -1,0 +1,17 @@
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+plan.json
+plan.txt
+*.tfvars
+!*.tfvars.example
+backend/*.hcl
+!backend/*.hcl.example
+.terraformrc
+terraform.rc
+.DS_Store
+.idea/
+.vscode/

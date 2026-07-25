@@ -1,0 +1,62 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    paths:
+      - '**/*.tf'
+      - '**/*.hcl'
+      - '.github/workflows/terraform-*.yml'
+      - '.tflint.hcl'
+      - 'policies/**'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.tf'
+      - '**/*.hcl'
+      - '.github/workflows/terraform-*.yml'
+      - '.tflint.hcl'
+      - 'policies/**'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform validate
+        run: ./scripts/validate-all.sh
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.64.0
+
+      - name: Initialise TFLint plugins
+        run: tflint --init
+
+      - name: TFLint
+        run: tflint --recursive
+
+      - name: Trivy IaC security scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          hide-progress: true
+          severity: HIGH,CRITICAL
+          exit-code: '1'

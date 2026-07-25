@@ -1,0 +1,9 @@
+bucket         = "replace-me-raksul-terraform-state-prod"
+key            = "prod/workloads/printing-api/ap-northeast-1/terraform.tfstate"
+region         = "ap-northeast-1"
+dynamodb_table = "replace-me-raksul-terraform-locks-prod"
+use_lockfile   = true
+encrypt        = true
+
+# Optional when the state bucket uses a customer-managed KMS key:
+# kms_key_id = "arn:aws:kms:ap-northeast-1:111111111111:key/replace-me"

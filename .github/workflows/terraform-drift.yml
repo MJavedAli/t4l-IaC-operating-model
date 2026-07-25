@@ -1,0 +1,99 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 04:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  TF_ROOT: live/prod/workloads/printing-api
+  AWS_REGION: ap-northeast-1
+  TF_VAR_cluster_arn: ${{ vars.PRINTING_API_CLUSTER_ARN_PROD }}
+  TF_VAR_subnet_ids: ${{ vars.PRINTING_API_SUBNET_IDS_JSON_PROD }}
+  TF_VAR_security_group_ids: ${{ vars.PRINTING_API_SECURITY_GROUP_IDS_JSON_PROD }}
+  TF_VAR_target_group_arn: ${{ vars.PRINTING_API_TARGET_GROUP_ARN_PROD }}
+  TF_VAR_container_image: ${{ vars.PRINTING_API_IMAGE_PROD }}
+
+concurrency:
+  group: terraform-drift-printing-api-production
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials for drift detection
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_PLAN_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-drift-printing-api-${{ github.run_id }}
+          allowed-account-ids: ${{ vars.PROD_PRINTING_ACCOUNT_ID }}
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_ROOT }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET_PROD }}" \
+            -backend-config="key=prod/workloads/printing-api/ap-northeast-1/terraform.tfstate" \
+            -backend-config="region=${{ vars.TF_STATE_REGION_PROD }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE_PROD }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: Detect drift
+        id: drift
+        working-directory: ${{ env.TF_ROOT }}
+        shell: bash
+        run: |
+          set +e
+          terraform plan -refresh-only -no-color -detailed-exitcode > drift.txt 2>&1
+          exit_code=$?
+          cat drift.txt
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          if [[ "${exit_code}" -eq 1 ]]; then
+            exit 1
+          fi
+          exit 0
+
+      - name: Open or update drift issue
+        if: steps.drift.outputs.exit_code == '2'
+        uses: actions/github-script@v9
+        env:
+          DRIFT_PATH: ${{ env.TF_ROOT }}/drift.txt
+        with:
+          script: |
+            const fs = require('fs');
+            const title = '[Terraform drift] production printing-api';
+            const raw = fs.readFileSync(process.env.DRIFT_PATH, 'utf8');
+            const max = 50000;
+            const drift = raw.length > max ? `${raw.slice(0, max)}\n... output truncated ...` : raw;
+            const body = `Drift was detected by workflow run ${context.runId}.\n\n` +
+              `Review whether this is an authorised emergency change, expected provider normalisation, or unauthorised mutation. ` +
+              `Do not auto-revert until the service owner confirms impact.\n\n` +
+              `<details><summary>Show refresh-only plan</summary>\n\n\`\`\`terraform\n${drift}\n\`\`\`\n</details>`;
+            const { owner, repo } = context.repo;
+            const issues = await github.rest.issues.listForRepo({ owner, repo, state: 'open', per_page: 100 });
+            const existing = issues.data.find(i => i.title === title && !i.pull_request);
+            if (existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body });
+            }

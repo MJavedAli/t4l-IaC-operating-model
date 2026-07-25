@@ -1,0 +1,116 @@
+name: Terraform PR Plan
+
+on:
+  pull_request:
+    paths:
+      - 'live/prod/workloads/printing-api/**'
+      - 'modules/ecs-service/**'
+      - 'policies/**'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: terraform-plan-printing-api-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  TF_ROOT: live/prod/workloads/printing-api
+  AWS_REGION: ap-northeast-1
+  TF_VAR_cluster_arn: ${{ vars.PRINTING_API_CLUSTER_ARN_PROD }}
+  TF_VAR_subnet_ids: ${{ vars.PRINTING_API_SUBNET_IDS_JSON_PROD }}
+  TF_VAR_security_group_ids: ${{ vars.PRINTING_API_SECURITY_GROUP_IDS_JSON_PROD }}
+  TF_VAR_target_group_arn: ${{ vars.PRINTING_API_TARGET_GROUP_ARN_PROD }}
+  TF_VAR_container_image: ${{ vars.PRINTING_API_IMAGE_PROD }}
+
+jobs:
+  plan:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials for planning
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_PLAN_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-plan-printing-api-${{ github.run_id }}
+          allowed-account-ids: ${{ vars.PROD_PRINTING_ACCOUNT_ID }}
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_ROOT }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET_PROD }}" \
+            -backend-config="key=prod/workloads/printing-api/ap-northeast-1/terraform.tfstate" \
+            -backend-config="region=${{ vars.TF_STATE_REGION_PROD }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE_PROD }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform plan
+        id: plan
+        working-directory: ${{ env.TF_ROOT }}
+        shell: bash
+        run: |
+          set +e
+          terraform plan -no-color -detailed-exitcode -out=tfplan > plan.txt 2>&1
+          exit_code=$?
+          cat plan.txt
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          if [[ "${exit_code}" -eq 1 ]]; then
+            exit 1
+          fi
+          exit 0
+
+      - name: Render plan JSON
+        if: steps.plan.outputs.exit_code != '1'
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform show -json tfplan > plan.json
+
+      - name: Evaluate organisation policy
+        if: steps.plan.outputs.exit_code != '1'
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            openpolicyagent/conftest:v0.68.2 \
+            test "/workspace/${TF_ROOT}/plan.json" --policy /workspace/policies
+
+      - name: Comment plan on pull request
+        if: always() && steps.plan.outputs.exit_code != ''
+        uses: actions/github-script@v9
+        env:
+          PLAN_PATH: ${{ env.TF_ROOT }}/plan.txt
+          PLAN_EXIT_CODE: ${{ steps.plan.outputs.exit_code }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- terraform-plan:printing-api -->';
+            const raw = fs.readFileSync(process.env.PLAN_PATH, 'utf8');
+            const max = 60000;
+            const plan = raw.length > max ? `${raw.slice(0, max)}\n... plan truncated ...` : raw;
+            const status = process.env.PLAN_EXIT_CODE === '0' ? 'No changes' :
+              process.env.PLAN_EXIT_CODE === '2' ? 'Changes detected' : 'Plan failed';
+            const body = `${marker}\n## Terraform plan — printing-api\n\n**Status:** ${status}\n\n<details><summary>Show plan</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n</details>`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const existing = comments.data.find(c => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

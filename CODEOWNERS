@@ -1,0 +1,9 @@
+# Replace example teams with real GitHub teams.
+*                                      @raksul/cloud-infra
+/modules/                              @raksul/cloud-infra @raksul/platform-architecture
+/policies/                             @raksul/cloud-infra @raksul/security-engineering
+/live/prod/                            @raksul/cloud-infra
+/live/prod/workloads/printing-api/     @raksul/cloud-infra @raksul/printing-platform
+/.github/workflows/                    @raksul/cloud-infra @raksul/security-engineering
+/docs/adr/                             @raksul/cloud-infra @raksul/platform-architecture
+/scripts/bootstrap-backend.sh          @raksul/cloud-infra @raksul/security-engineering

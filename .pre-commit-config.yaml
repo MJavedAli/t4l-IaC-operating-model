@@ -1,0 +1,26 @@
+repos:
+  - repo: local
+    hooks:
+      - id: terraform-fmt
+        name: terraform fmt
+        entry: terraform fmt -check -recursive
+        language: system
+        pass_filenames: false
+
+      - id: terraform-validate
+        name: terraform validate all directories
+        entry: scripts/validate-all.sh
+        language: system
+        pass_filenames: false
+
+      - id: tflint
+        name: tflint
+        entry: bash -c 'tflint --init && tflint --recursive'
+        language: system
+        pass_filenames: false
+
+      - id: trivy-config
+        name: trivy config scan
+        entry: trivy config --severity HIGH,CRITICAL --exit-code 1 .
+        language: system
+        pass_filenames: false
