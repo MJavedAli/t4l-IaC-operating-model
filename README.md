@@ -1,6 +1,6 @@
 # R4L Terraform Operating Model
 
-> **Purpose:** demonstrate a small, end-to-end Terraform operating model for an AWS-centric, multi-account organisation. This repository is an assessment artefact, not r4l production code.
+> **Purpose:** demonstrate a small, end-to-end Terraform operating model for an AWS-centric, multi-account organisation. This repository is an assessment artefact, not RAKSUL production code.
 
 ## 1. Purpose
 
